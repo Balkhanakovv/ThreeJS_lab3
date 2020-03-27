@@ -1,0 +1,55 @@
+# Max2Mtl Version 4.0 Mar 10th, 2001
+#
+newmtl leaf01
+Ka  0.5 0.6 0.2
+Kd  0.5 0.6 0.2
+Ks  0.0 0.0 0.0
+d  1.0
+Ns  0.0
+illum 2
+map_Kd ned-col.jpg
+map_d ned-clip.jpg
+#
+# Multi/Sub Material__574 (4) to come 
+#
+newmtl default01
+Ka  0.4 0.4 0.4
+Kd  0.4 0.4 0.4
+Ks  1.0 1.0 1.0
+d  1.0
+Ns  0.0
+illum 2
+#
+newmtl td_branch01
+Ka  0.5 0.4 0.2
+Kd  0.5 0.4 0.2
+Ks  0.0 0.0 0.0
+d  1.0
+Ns  0.0
+illum 2
+map_Kd bark.jpg
+bump bark_b.jpg
+#
+newmtl td_trunk01
+Ka  0.5 0.4 0.2
+Kd  0.5 0.4 0.2
+Ks  0.0 0.0 0.0
+d  1.0
+Ns  0.0
+illum 2
+map_Kd bark.jpg
+bump bark_b.jpg
+#
+newmtl td_root01
+Ka  0.5 0.4 0.2
+Kd  0.5 0.4 0.2
+Ks  0.0 0.0 0.0
+d  1.0
+Ns  0.0
+illum 2
+map_Kd bark.jpg
+bump bark_b.jpg
+#
+# Multi/Sub Material__574 done 
+#
+# EOF
