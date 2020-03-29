@@ -1,18 +1,15 @@
 var container;
 var camera, scene, renderer;
-var spotlight = new THREE.PointLight(0xffffff);
-var light = new THREE.DirectionalLight(0xffffff);
 var clock = new THREE.Clock();
-var imagedata;
-var geometry;
-var sphere;
-var vertices = [];
+var imagedata, geometry, sphere;
+var spotlight = new THREE.PointLight(0xffffff);
+var keyboard = new THREEx.KeyboardState();
 
 var parrotPath;
+var flamingoPath;
 
 var N = 256;
-var mixers, morphs = [];
-
+var mixers, vertices, morphs = [];
 
 init();
 animate();
@@ -22,8 +19,8 @@ function init()
     container = document.getElementById( 'container' );
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 4000); 
-    camera.position.set(N/2, N*1.5, N/2);
-    camera.lookAt(new THREE.Vector3( N/2, 15, N/2));
+    camera.position.set(N*2, 100, N);
+    camera.lookAt(new THREE.Vector3( N/2, 0, N/2));
     
     renderer = new THREE.WebGLRenderer( { antialias: false } );
     renderer.setSize( window.innerWidth, window.innerHeight );
@@ -35,28 +32,25 @@ function init()
     window.addEventListener( 'resize', onWindowResize, false );
  
     mixers = new THREE.AnimationMixer( scene );
-
-    spotlight.position.set(2, 100, 100);     
-    spotlight.intensity = 2;    
-    spotlight.castShadow = true;
-
+    
+    spotlight.position.set(N, N*2, N/2);
     scene.add( spotlight );
 
-    light.position.set( 2, 100, 100 );
+    var light = new THREE.DirectionalLight(0xffff00);
+    light.position.set( -N, N*2, 0 );   
     light.target = new THREE.Object3D();
+
     light.target.position.set( 0, 0, 0 );
     scene.add(light.target);
-    
+
     light.castShadow = true;
-    light.shadow = new THREE.LightShadow( new THREE.PerspectiveCamera( 50, 1, 1200, 2500 ) );
+    light.shadow = new THREE.LightShadow( new THREE.PerspectiveCamera( 45, 1, 1, 2500 ) );
     light.shadow.bias = 0.0001;
-    light.shadow.mapSize.width = 2048;
-    light.shadow.mapSize.height = 2048;
+    light.shadow.mapSize.width = 4096;
+    light.shadow.mapSize.height = 4096;
 
     scene.add( light );
     addSky();
-
-
 
     var canvas = document.createElement('canvas');
     var context = canvas.getContext('2d');
@@ -73,13 +67,13 @@ function init()
     }
     img.src = 'pics/plateau.jpg';
 
-
     loadModel('models/Дерево/', 'Tree.obj', 'Tree.mtl');
-    loadModel('models/Пальма/', 'Palma 001.obj', 'Palma 001.mtl');
-        
-    loadAnimatedModel('models/animate/Parrot.glb');
-        
-    parrotPath = addT();
+    loadModel('models/Пальма/', 'Palma 001.obj', 'Palma 001.mtl');       
+    
+    parrotPath = addParrotT();
+    flamingoPath = addFlamigoT();
+    loadAnimatedModel('models/animate/Parrot.glb', parrotPath);
+    loadAnimatedModel('models/animate/Flamingo.glb', flamingoPath);
 }
 
 function onWindowResize()
@@ -92,6 +86,9 @@ function onWindowResize()
 var a = 0.0;
 var t = 0.0;
 var T = 10.0
+var followParrot = false;
+var followFlamingo = false;
+
 function animate()
 {
     a += 0.001;
@@ -99,8 +96,7 @@ function animate()
 
     var delta = clock.getDelta();
     mixers.update( delta );
-
-    for ( var i = 0; i < mixers.length; i++ )
+    for ( var i = 0; i < morphs.length; i++ )
     {
         var morph = morphs[ i ];
         var pos = new THREE.Vector3();
@@ -108,10 +104,42 @@ function animate()
         if ( t >= T) 
             t = 0.0;
         
-        pos.copy(parrotPath.getPointAt(t/T));
-        morph.position.copy(pos);
+        pos.copy(morph.route.getPointAt(t/T));
+        morph.mesh.position.copy(pos);
+        t += 0.015
+
+        if ( t >= T) 
+            t = 0.0;
+
+        var nextPoint = new THREE.Vector3();
+        nextPoint.copy(morph.route.getPointAt((t)/T));
+        morph.mesh.lookAt(nextPoint);
+
+        if (followParrot && i==0){
+            cameraFollow(morph)
+        }
+
+        if (followFlamingo && i==1){
+            cameraFollow(morph);
+        }
     }
 
+    if (keyboard.pressed("0")){
+        followParrot = false;
+        followFlamingo = false;
+        camera.position.set(N*2, 100, N);
+        camera.lookAt(new THREE.Vector3( N/2, 0, N/2));
+    }
+
+    if (keyboard.pressed("1")){
+        followParrot = true;
+        followFlamingo = false;
+    }
+
+    if (keyboard.pressed("2")){
+        followParrot = false;
+        followFlamingo = true;
+    }
 
     requestAnimationFrame( animate );
     render();
@@ -146,6 +174,17 @@ function loadModel(path, oname, mname)
 
         objLoader.load ( oname, function ( object )
         {
+            
+            object.castShadow = true;
+            object.traverse( function ( child )
+            {
+                if ( child instanceof THREE.Mesh )
+                {
+                    child.castShadow = true;
+                }
+            } );
+
+
             for(var i = 0; i < 5; i++){
                 var x = Math.random()*N;
                 var z = Math.random()*N;
@@ -158,8 +197,6 @@ function loadModel(path, oname, mname)
 
                 var s = (Math.random() * 0.2) + 0.1;
                 object.scale.set(s, s, s);
-                object.receiveShadow = true;
-                object.castShadow = true;
                 scene.add( object.clone());
             }
         }, onProgress, onError ); 
@@ -185,7 +222,7 @@ function addSky()
     
 }
 
-function loadAnimatedModel(path)
+function loadAnimatedModel(path, route)
 {
     var loader = new THREE.GLTFLoader();
 
@@ -203,7 +240,12 @@ function loadAnimatedModel(path)
         mesh.receiveShadow = true;
 
         scene.add( mesh );
-        morphs.push( mesh );
+
+        model = {};
+        model.mesh = mesh;
+        model.route = route;
+
+        morphs.push( model );
     });
 }
 
@@ -255,6 +297,8 @@ function CreateTerrain()
     });
  
     var matMesh = new THREE.Mesh(geometry, mat); 
+    
+    matMesh.receiveShadow = true;
     scene.add(matMesh);
 }
 
@@ -264,7 +308,7 @@ function getPixel( imagedata, x, y )
     return data[ position ];
 }
 
-function addT()
+function addParrotT()
 {    
     var curve1 = new THREE.CubicBezierCurve3(
         new THREE.Vector3( 30, 50, 128 ), 
@@ -284,12 +328,45 @@ function addT()
     vertices = vertices.concat(curve2.getPoints( 20 ))
     var path = new THREE.CatmullRomCurve3(vertices);
     path.closed = true;
-    var geometry = new THREE.Geometry();
-    geometry.vertices = vertices;
-    var material = new THREE.LineBasicMaterial( { color : 0xff0000 } );
-    var curveObject = new THREE.Line( geometry, material );
-    
-    scene.add(curveObject);
 
     return path;
+}
+
+function addFlamigoT()
+{
+    var curve1 = new THREE.CubicBezierCurve3(
+        new THREE.Vector3( 226, 100, 128), 
+        new THREE.Vector3( 226, 100, 0 ),
+        new THREE.Vector3( 30, 100, 0 ),
+        new THREE.Vector3( 30, 100, 128 )         
+    );
+
+    var curve2 = new THREE.CubicBezierCurve3(
+        new THREE.Vector3( 30, 100, 128 ),
+        new THREE.Vector3( 30, 100, 256 ),
+        new THREE.Vector3( 226, 100, 256 ),
+        new THREE.Vector3( 226, 100, 128)    
+    );
+
+    vertices = curve1.getPoints( 20 );
+    vertices = vertices.concat(curve2.getPoints( 20 ))
+    var path = new THREE.CatmullRomCurve3(vertices);
+    path.closed = true;
+
+    return path;
+}
+
+function cameraFollow(morph)
+{
+    var relativeCameraOffset = new THREE.Vector3(0,15,-40 );
+    var m1 = new THREE.Matrix4();
+    var m2 = new THREE.Matrix4();
+
+    m1.extractRotation(morph.mesh.matrixWorld);
+    m2.copyPosition(morph.mesh.matrixWorld);
+    m1.multiplyMatrices(m2, m1);
+
+    var cameraOffset = relativeCameraOffset.applyMatrix4(m1);
+    camera.position.copy(cameraOffset);
+    camera.lookAt(morph.mesh.position );
 }
